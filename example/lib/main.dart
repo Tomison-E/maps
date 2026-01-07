@@ -54,8 +54,6 @@ final List<ExamplePage> _allPages = <ExamplePage>[
 ];
 
 class MapsDemo extends StatefulWidget {
-  // FIXME: You need to pass in your access token via the command line argument
-  // --dart-define=ACCESS_TOKEN=ADD_YOUR_TOKEN_HERE
   // It is also possible to pass it in while running the app via an IDE by
   // passing the same args there.
   //

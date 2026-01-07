@@ -1,11 +1,12 @@
-part of mapbox_gl_web;
+part of mapbox_gl_wasm;
 
 const _mapboxGlCssUrl =
     'https://api.mapbox.com/mapbox-gl-js/v2.7.0/mapbox-gl.css';
 
-class MapboxWebGlPlatform extends MapboxGlPlatform
+class MapboxWasmGlPlatform extends MapboxGlPlatform
     implements MapboxMapOptionsSink {
-  late web.HTMLDivElement _mapElement;
+  JSObject? _mapElement;
+  String? _mapElementId;
 
   late Map<String, dynamic> _creationParams;
   late MapboxMap _map;
@@ -32,49 +33,53 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
       OnPlatformViewCreatedCallback onPlatformViewCreated,
       Set<Factory<OneSequenceGestureRecognizer>>? gestureRecognizers) {
     _creationParams = creationParams;
-    _registerViewFactory(onPlatformViewCreated, this.hashCode);
-    return HtmlElementView(
-        viewType: 'plugins.flutter.io/mapbox_gl_${this.hashCode}');
+    _mapElementId = 'mapbox_gl_wasm_${this.hashCode}';
+    
+    // Create a widget that will host the map using JS interop
+    return _WasmMapWidget(
+      mapElementId: _mapElementId!,
+      onPlatformViewCreated: onPlatformViewCreated,
+      onElementCreated: (JSObject element) {
+        _mapElement = element;
+        initPlatform(this.hashCode);
+      },
+    );
   }
 
   @override
   void dispose() {
     super.dispose();
-    _map.remove();
-  }
-
-  void _registerViewFactory(Function(int) callback, int identifier) {
-    // ignore: undefined_prefixed_name
-    ui.platformViewRegistry.registerViewFactory(
-        'plugins.flutter.io/mapbox_gl_$identifier', (int viewId) {
-      _mapElement = web.HTMLDivElement()
-        ..style.position = 'absolute'
-        ..style.top = '0'
-        ..style.bottom = '0'
-        ..style.width = '100%';
-      callback(viewId);
-      return _mapElement;
-    });
+    if (_mapElement != null) {
+      _map.remove();
+      // Clean up the element via JS interop
+      final parent = _mapElement!.getProperty('parentNode'.toJS) as JSObject?;
+      if (parent != null) {
+        parent.removeChild(_mapElement!);
+      }
+    }
   }
 
   @override
   Future<void> initPlatform(int id) async {
-    await _addStylesheetToShadowRoot(_mapElement);
+    if (_mapElement == null) return;
+    
+    await _addStylesheet(_mapElement!);
+    
     if (_creationParams.containsKey('initialCameraPosition')) {
       var camera = _creationParams['initialCameraPosition'];
       _dragEnabled = _creationParams['dragEnabled'] ?? true;
 
       if (_creationParams.containsKey('accessToken')) {
-        final mapboxgl =
-            (web.window as JSObject).getProperty('mapboxgl'.toJS) as JSObject?;
+        final mapboxgl = window.getProperty('mapboxgl'.toJS) as JSObject?;
         if (mapboxgl != null) {
           mapboxgl.setProperty(
-              'accessToken'.toJS, _creationParams['accessToken'.toJS]);
+              'accessToken'.toJS, _creationParams['accessToken'].toJS);
         }
       }
+      
       _map = MapboxMap(
         MapOptions(
-          container: _mapElement,
+          container: _mapElement!,
           style: 'mapbox://styles/mapbox/streets-v11',
           center: LngLat(camera['target'][1], camera['target'][0]),
           zoom: camera['zoom'],
@@ -83,6 +88,7 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
           preserveDrawingBuffer: true,
         ),
       );
+      
       _map.on('load', _onStyleLoaded);
       _map.on('click', _onMapClick);
       // long click not available in web, so it is mapped to double click
@@ -103,9 +109,9 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
   }
 
   void _initResizeObserver() {
-    final resizeObserver = web.ResizeObserver(
-        (JSArray<web.ResizeObserverEntry> entries,
-            web.ResizeObserver observer) {
+    if (_mapElement == null) return;
+    
+    final callback = ((JSArray entries, JSObject observer) {
       // The resize observer might be called a lot of times when the user resizes the browser window with the mouse for example.
       // Due to the fact that the resize call is quite expensive it should not be called for every triggered event but only the last one, like "onMoveEnd".
       // But because there is no event type for the end, there is only the option to spawn timers and cancel the previous ones if they get overwritten by a new event.
@@ -113,8 +119,13 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
       lastResizeObserverTimer = Timer(Duration(milliseconds: 50), () {
         _onMapResize();
       });
-    }.toJS);
-    resizeObserver.observe(web.document.body as web.Element);
+    }).toJS;
+    
+    final resizeObserver = ResizeObserver(callback);
+    final body = document.getProperty('body'.toJS) as JSObject?;
+    if (body != null) {
+      resizeObserver.observe(body);
+    }
   }
 
   void _loadFromAssets(Event event) async {
@@ -129,7 +140,8 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
       // Prevent the default map drag behavior.
       e.preventDefault();
       _draggedFeatureId = e.features[0].id;
-      _map.getCanvas().style.cursor = 'grabbing';
+      final canvas = _map.getCanvas() as JSObject;
+      canvas.setStyle('cursor', 'grabbing');
       var coords = e.lngLat;
       _dragOrigin = LatLng(coords.lat as double, coords.lng as double);
 
@@ -165,7 +177,8 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
     _draggedFeatureId = null;
     _dragPrevious = null;
     _dragOrigin = null;
-    _map.getCanvas().style.cursor = '';
+    final canvas = _map.getCanvas() as JSObject;
+    canvas.setStyle('cursor', '');
   }
 
   _onMouseMove(Event e) {
@@ -184,19 +197,13 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
     }
   }
 
-  Future<void> _addStylesheetToShadowRoot(web.HTMLElement e) async {
-    web.HTMLLinkElement link = web.HTMLLinkElement()
-      ..href = _mapboxGlCssUrl
-      ..rel = 'stylesheet';
-    e.append(link);
-
-    await link.onLoad.first;
+  Future<void> _addStylesheet(JSObject parent) async {
+    await loadStylesheet(parent, _mapboxGlCssUrl);
   }
 
   @override
   Future<CameraPosition?> updateMapOptions(
       Map<String, dynamic> optionsUpdate) async {
-    // FIX: why is called indefinitely? (map_ui page)
     Convert.interpretMapboxMapOptions(optionsUpdate, this);
     return _getCameraPosition();
   }
@@ -388,10 +395,15 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
 
   void _onMapResize() {
     Timer(Duration(), () {
-      var container = _map.getContainer();
-      var canvas = _map.getCanvas();
-      var widthMismatch = canvas.clientWidth != container.clientWidth;
-      var heightMismatch = canvas.clientHeight != container.clientHeight;
+      var container = _map.getContainer() as JSObject;
+      var canvas = _map.getCanvas() as JSObject;
+      int containerWidth = container.clientWidth;
+      int containerHeight = container.clientHeight;
+      int canvasWidth = canvas.clientWidth;
+      int canvasHeight = canvas.clientHeight;
+      
+      var widthMismatch = canvasWidth != containerWidth;
+      var heightMismatch = canvasHeight != containerHeight;
       if (widthMismatch || heightMismatch) {
         _map.resize();
       }
@@ -605,7 +617,6 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
 
   @override
   void setMinMaxZoomPreference(num? min, num? max) {
-    // FIX: why is called indefinitely? (map_ui page)
     _map.setMinZoom(min);
     _map.setMaxZoom(max);
   }
@@ -931,12 +942,14 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
 
   void _onMouseEnterFeature(_) {
     if (_draggedFeatureId == null) {
-      _map.getCanvas().style.cursor = 'pointer';
+      final canvas = _map.getCanvas() as JSObject;
+      canvas.setStyle('cursor', 'pointer');
     }
   }
 
   void _onMouseLeaveFeature(_) {
-    _map.getCanvas().style.cursor = '';
+    final canvas = _map.getCanvas() as JSObject;
+    canvas.setStyle('cursor', '');
   }
 
   @override
@@ -1064,8 +1077,14 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
         snapshotOptions.heading != 0) {
       throw UnsupportedError("camera posision option is not supported");
     }
-    final base64String = await _map.getCanvas().toDataUrl('image/jpeg');
-    return base64String;
+    final canvas = _map.getCanvas();
+    final canvasObj = canvas as JSObject;
+    final toDataUrl = canvasObj.getProperty('toDataURL'.toJS) as JSFunction?;
+    if (toDataUrl != null) {
+      final result = toDataUrl.callAsFunction(canvasObj, 'image/jpeg'.toJS);
+      return (result as JSString?)?.toDart ?? '';
+    }
+    return '';
   }
 
   @override
@@ -1078,3 +1097,95 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
     _map.resize();
   }
 }
+
+/// Custom widget for WASM-compatible map rendering
+class _WasmMapWidget extends StatefulWidget {
+  final String mapElementId;
+  final OnPlatformViewCreatedCallback onPlatformViewCreated;
+  final void Function(JSObject element) onElementCreated;
+
+  const _WasmMapWidget({
+    required this.mapElementId,
+    required this.onPlatformViewCreated,
+    required this.onElementCreated,
+  });
+
+  @override
+  State<_WasmMapWidget> createState() => _WasmMapWidgetState();
+}
+
+class _WasmMapWidgetState extends State<_WasmMapWidget> {
+  JSObject? _element;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _createMapElement();
+    });
+  }
+
+  void _createMapElement() {
+    // Create a div element using JS interop
+    final element = createElement('div');
+    element.setAttribute('id', widget.mapElementId);
+    element.setStyle('position', 'absolute');
+    element.setStyle('top', '0');
+    element.setStyle('bottom', '0');
+    element.setStyle('left', '0');
+    element.setStyle('right', '0');
+    element.setStyle('width', '100%');
+    element.setStyle('height', '100%');
+
+    // Use a timer to ensure the DOM is ready
+    Timer(Duration(milliseconds: 100), () {
+      // Try to find the container element
+      final containerId = widget.mapElementId + '_container';
+      final container = getElementById(containerId) ?? 
+                       querySelector('[data-map-container="$containerId"]');
+      
+      if (container != null) {
+        container.appendChild(element);
+        _element = element;
+        widget.onElementCreated(element);
+        widget.onPlatformViewCreated(widget.hashCode);
+      } else {
+        // Fallback: append to body or create a container
+        final body = document.getProperty('body'.toJS) as JSObject?;
+        if (body != null) {
+          body.appendChild(element);
+          _element = element;
+          widget.onElementCreated(element);
+          widget.onPlatformViewCreated(widget.hashCode);
+        }
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // For WASM compatibility, we use a simple container
+    // The map element will be created and managed via JS interop
+    return SizedBox(
+      width: double.infinity,
+      height: double.infinity,
+      child: Container(
+        key: Key(widget.mapElementId + '_container'),
+        width: double.infinity,
+        height: double.infinity,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    if (_element != null) {
+      final parent = _element!.getProperty('parentNode'.toJS) as JSObject?;
+      if (parent != null) {
+        parent.removeChild(_element!);
+      }
+    }
+    super.dispose();
+  }
+}
+

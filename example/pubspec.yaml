@@ -17,14 +17,15 @@ dependencies:
   path_provider: ^2.0.0
   http: ^0.13.0
   collection: ^1.0.0
-  device_info_plus: ^9.0.0
+  device_info_plus: ^12.3.0
 
 dependency_overrides:
   mapbox_gl_platform_interface:
     path: ../mapbox_gl_platform_interface
   mapbox_gl_web:
     path: ../mapbox_gl_web
-
+  mapbox_gl_wasm:
+    path: ../mapbox_gl_wasm
 dev_dependencies:
   flutter_test:
     sdk: flutter

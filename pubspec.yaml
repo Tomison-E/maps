@@ -21,6 +21,8 @@ dependency_overrides:
     path: ./mapbox_gl_platform_interface
   mapbox_gl_web:
     path: ./mapbox_gl_web
+  mapbox_gl_wasm:
+    path: ./mapbox_gl_wasm
 
 flutter:
   plugin:

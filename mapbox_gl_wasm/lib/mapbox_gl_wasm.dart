@@ -1,28 +1,26 @@
-library mapbox_gl_web;
+library mapbox_gl_wasm;
 
 import 'dart:async';
 import 'dart:convert';
-// FIXED HERE: https://github.com/dart-lang/linter/pull/1985
-// ignore_for_file: avoid_web_libraries_in_flutter
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 import 'dart:math';
-import 'package:web/web.dart' as web;
-import 'dart:ui_web' as ui;
+import 'dart:typed_data';
 import 'package:flutter/services.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart' hide Element;
+import 'package:flutter/material.dart';
 
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:mapbox_gl_platform_interface/mapbox_gl_platform_interface.dart';
 import 'package:mapbox_gl_dart/mapbox_gl_dart.dart' hide Point, Source;
 import 'package:mapbox_gl_dart/mapbox_gl_dart.dart' as mapbox show Point;
 import 'package:image/image.dart' hide Point;
-import 'package:mapbox_gl_web/src/layer_tools.dart';
-
 part 'src/convert.dart';
-part 'src/mapbox_map_plugin.dart';
+part 'src/mapbox_map_wasm_plugin.dart';
 part 'src/options_sink.dart';
-part 'src/mapbox_web_gl_platform.dart';
+part 'src/layer_tools.dart';
+part 'src/mapbox_wasm_gl_platform.dart';
+part 'src/js_interop.dart';
+

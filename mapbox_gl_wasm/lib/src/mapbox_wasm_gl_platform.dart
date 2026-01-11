@@ -213,11 +213,12 @@ class MapboxWasmGlPlatform extends MapboxGlPlatform
       {Duration? duration}) async {
     final cameraOptions = Convert.toCameraOptions(cameraUpdate, _map);
 
-    final around = (cameraOptions as JSObject).getProperty('around'.toJS);
-    final bearing = (cameraOptions as JSObject).getProperty('bearing'.toJS);
-    final center = (cameraOptions as JSObject).getProperty('center'.toJS);
-    final pitch = (cameraOptions as JSObject).getProperty('pitch'.toJS);
-    final zoom = (cameraOptions as JSObject).getProperty('zoom'.toJS);
+    final jsObj = cameraOptions.jsObject;
+    final around = jsObj.around;
+    final bearing = jsObj.bearing;
+    final center = jsObj.center;
+    final pitch = jsObj.pitch;
+    final zoom = jsObj.zoom;
 
     _map.flyTo({
       if (around != null) 'around': around,

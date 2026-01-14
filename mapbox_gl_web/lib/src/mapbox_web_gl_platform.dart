@@ -865,10 +865,15 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
   @override
   Future<void> setGeoJsonSource(
       String sourceId, Map<String, dynamic> geojson) async {
-    final source = _map.getSource(sourceId) as GeoJsonSource;
+    final source = _map.getSource(sourceId);
+    if (source == null) {
+      print('Warning: Source $sourceId not found, cannot set GeoJSON data');
+      return;
+    }
+    final geoJsonSource = source as GeoJsonSource;
     final data = _makeFeatureCollection(geojson);
     _addedFeaturesByLayer[sourceId] = data;
-    source.setData(data);
+    geoJsonSource.setData(data);
   }
 
   @override

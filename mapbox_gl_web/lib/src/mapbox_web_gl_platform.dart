@@ -1,7 +1,7 @@
 part of mapbox_gl_web;
 
 const _mapboxGlCssUrl =
-    'https://api.mapbox.com/mapbox-gl-js/v2.7.0/mapbox-gl.css';
+    'https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css';
 
 class MapboxWebGlPlatform extends MapboxGlPlatform
     implements MapboxMapOptionsSink {
@@ -50,8 +50,9 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
       _mapElement = web.HTMLDivElement()
         ..style.position = 'absolute'
         ..style.top = '0'
-        ..style.bottom = '0'
-        ..style.width = '100%';
+        ..style.left = '0'
+        ..style.width = '100%'
+        ..style.height = '100%'; // Required for WASM/Skwasm compatibility
       callback(viewId);
       return _mapElement;
     });
@@ -59,47 +60,107 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
 
   @override
   Future<void> initPlatform(int id) async {
-    await _addStylesheetToShadowRoot(_mapElement);
-    if (_creationParams.containsKey('initialCameraPosition')) {
-      var camera = _creationParams['initialCameraPosition'];
-      _dragEnabled = _creationParams['dragEnabled'] ?? true;
+    try {
+      // Add stylesheet (will timeout gracefully if already loaded in index.html)
+      await _addStylesheetToShadowRoot(_mapElement);
 
-      if (_creationParams.containsKey('accessToken')) {
-        final mapboxgl =
-            (web.window as JSObject).getProperty('mapboxgl'.toJS) as JSObject?;
-        if (mapboxgl != null) {
-          mapboxgl.setProperty(
-              'accessToken'.toJS, _creationParams['accessToken'.toJS]);
+      // Ensure element is attached and has dimensions
+      await _waitForElementReady();
+
+      if (_creationParams.containsKey('initialCameraPosition')) {
+        var camera = _creationParams['initialCameraPosition'];
+        _dragEnabled = _creationParams['dragEnabled'] ?? true;
+
+        // Set access token
+        if (_creationParams.containsKey('accessToken')) {
+          final mapboxgl = (web.window as JSObject).getProperty('mapboxgl'.toJS)
+              as JSObject?;
+          if (mapboxgl != null) {
+            final token = _creationParams['accessToken'] as String?;
+            if (token != null && token.isNotEmpty) {
+              mapboxgl.setProperty('accessToken'.toJS, token.toJS);
+            }
+          } else {
+            print(
+                'Warning: mapboxgl not found on window. Make sure mapbox-gl.js is loaded.');
+          }
         }
-      }
-      _map = MapboxMap(
-        MapOptions(
-          container: _mapElement,
-          style: 'mapbox://styles/mapbox/streets-v11',
-          center: LngLat(camera['target'][1], camera['target'][0]),
-          zoom: camera['zoom'],
-          bearing: camera['bearing'],
-          pitch: camera['tilt'],
-          preserveDrawingBuffer: true,
-        ),
-      );
-      _map.on('load', _onStyleLoaded);
-      _map.on('click', _onMapClick);
-      // long click not available in web, so it is mapped to double click
-      _map.on('dblclick', _onMapLongClick);
-      _map.on('movestart', _onCameraMoveStarted);
-      _map.on('move', _onCameraMove);
-      _map.on('moveend', _onCameraIdle);
-      _map.on('resize', (_) => _onMapResize());
-      _map.on('styleimagemissing', _loadFromAssets);
-      if (_dragEnabled) {
-        _map.on('mouseup', _onMouseUp);
-        _map.on('mousemove', _onMouseMove);
+
+        // Extract camera parameters with null safety
+        final target = camera['target'];
+        final double lat = target != null && target is List && target.length > 0
+            ? (target[0] as num).toDouble()
+            : 0.0;
+        final double lng = target != null && target is List && target.length > 1
+            ? (target[1] as num).toDouble()
+            : 0.0;
+        final double zoom = (camera['zoom'] as num?)?.toDouble() ?? 0.0;
+        final double bearing = (camera['bearing'] as num?)?.toDouble() ?? 0.0;
+        final double pitch = (camera['tilt'] as num?)?.toDouble() ?? 0.0;
+
+        _map = MapboxMap(
+          MapOptions(
+            container: _mapElement,
+            style: 'mapbox://styles/mapbox/streets-v11',
+            center: LngLat(lng, lat),
+            zoom: zoom,
+            bearing: bearing,
+            pitch: pitch,
+            preserveDrawingBuffer: true,
+          ),
+        );
+
+        // Add error handler
+        _map.on('error', (e) {
+          print('Mapbox map error: $e');
+        });
+
+        // Wait for the map to fully load before completing initialization
+        // This prevents vec4.js errors from Mapbox's internal mouse handlers
+        final loadCompleter = Completer<void>();
+
+        _map.on('load', (e) {
+          _onStyleLoaded(e);
+
+          // Register interaction events after map is fully loaded
+          _map.on('click', _onMapClick);
+          // long click not available in web, so it is mapped to double click
+          _map.on('dblclick', _onMapLongClick);
+
+          if (_dragEnabled) {
+            _map.on('mouseup', _onMouseUp);
+            _map.on('mousemove', _onMouseMove);
+          }
+
+          // Signal that map is ready
+          if (!loadCompleter.isCompleted) {
+            loadCompleter.complete();
+          }
+        });
+
+        // These events are safe to register before load
+        _map.on('movestart', _onCameraMoveStarted);
+        _map.on('move', _onCameraMove);
+        _map.on('moveend', _onCameraIdle);
+        _map.on('resize', (_) => _onMapResize());
+        _map.on('styleimagemissing', _loadFromAssets);
+
+        _initResizeObserver();
+
+        // Wait for map to be fully loaded with a timeout
+        await loadCompleter.future.timeout(
+          Duration(seconds: 30),
+          onTimeout: () {
+            print('Warning: Map load timed out after 30 seconds');
+          },
+        );
       }
 
-      _initResizeObserver();
+      Convert.interpretMapboxMapOptions(_creationParams['options'], this);
+    } catch (e) {
+      // Log error but don't rethrow - the map may still work despite initialization issues
+      print('Mapbox initialization warning: $e');
     }
-    Convert.interpretMapboxMapOptions(_creationParams['options'], this);
   }
 
   void _initResizeObserver() {
@@ -184,13 +245,48 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
     }
   }
 
-  Future<void> _addStylesheetToShadowRoot(web.HTMLElement e) async {
-    web.HTMLLinkElement link = web.HTMLLinkElement()
-      ..href = _mapboxGlCssUrl
-      ..rel = 'stylesheet';
-    e.append(link);
+  /// Wait for the map element to be properly laid out in the DOM with valid dimensions
+  Future<void> _waitForElementReady() async {
+    // Wait up to 2 seconds for element to have valid dimensions
+    for (int i = 0; i < 40; i++) {
+      final width = _mapElement.offsetWidth;
+      final height = _mapElement.offsetHeight;
 
-    await link.onLoad.first;
+      if (width > 0 && height > 0) {
+        return;
+      }
+
+      await Future.delayed(Duration(milliseconds: 50));
+    }
+
+    // If still no dimensions, log a warning but continue
+    print(
+        'Warning: Map element may have zero dimensions. Map rendering may fail.');
+  }
+
+  Future<void> _addStylesheetToShadowRoot(web.HTMLElement e) async {
+    try {
+      web.HTMLLinkElement link = web.HTMLLinkElement()
+        ..href = _mapboxGlCssUrl
+        ..rel = 'stylesheet';
+      e.append(link);
+
+      // Use a timeout to avoid hanging if stylesheet fails to load
+      bool loaded = false;
+      link.onLoad.first.then((_) => loaded = true);
+
+      // Wait up to 5 seconds for the stylesheet to load
+      for (int i = 0; i < 50 && !loaded; i++) {
+        await Future.delayed(Duration(milliseconds: 100));
+      }
+
+      if (!loaded) {
+        print('Warning: Mapbox CSS stylesheet load timed out, continuing...');
+      }
+    } catch (e) {
+      print('Warning: Failed to load Mapbox CSS: $e');
+      // Continue anyway - CSS might already be loaded in index.html
+    }
   }
 
   @override
@@ -246,10 +342,11 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
 
   @override
   Future<void> setMapLanguage(String language) async {
+    // Convert Dart list to JS value for WASM compatibility
     _map.setLayoutProperty(
       'country-label',
       'text-field',
-      ['get', 'name_' + language],
+      ['get', 'name_' + language].jsify(),
     );
   }
 
@@ -349,18 +446,29 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
   @override
   Future<void> addImage(String name, Uint8List bytes,
       [bool sdf = false]) async {
-    final photo = decodeImage(bytes)!;
-    if (!_map.hasImage(name)) {
-      _map.addImage(
-        name,
-        {
-          'width': photo.width,
-          'height': photo.height,
-          'data': photo.getBytes(),
-        },
-        {'sdf': sdf},
-      );
+    final photo = decodeImage(bytes);
+    if (photo == null) {
+      print('Warning: Could not decode image for $name');
+      return;
     }
+
+    if (_map.hasImage(name)) {
+      return; // Image already exists
+    }
+
+    // Get raw RGBA bytes from the decoded image
+    final imageBytes = photo.getBytes();
+
+    // Create image data object - Mapbox expects { width, height, data: Uint8Array }
+    // Pass data as Uint8List and let jsifyAny convert it
+    final imageData = <String, dynamic>{
+      'width': photo.width,
+      'height': photo.height,
+      'data': imageBytes,
+    };
+
+    // Pass as Map - jsifyAny in map.dart will convert it
+    _map.addImage(name, imageData, {'sdf': sdf});
   }
 
   @override
@@ -643,10 +751,13 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
   void setStyleString(String? styleString) {
     //remove old mouseenter callbacks to avoid multicalling
     for (var layerId in _interactiveFeatureLayerIds) {
-      _map.off('mouseenter', layerId, _onMouseEnterFeature);
-      _map.off('mousemouve', layerId, _onMouseEnterFeature);
-      _map.off('mouseleave', layerId, _onMouseLeaveFeature);
-      if (_dragEnabled) _map.off('mousedown', layerId, _onMouseDown);
+      // Convert layerId to JSValue for WASM compatibility
+      final jsLayerId = layerId.toJS;
+      _map.off('mouseenter', jsLayerId, _onMouseEnterFeature);
+      _map.off('mousemove', jsLayerId,
+          _onMouseEnterFeature); // Fixed typo: mousemouve -> mousemove
+      _map.off('mouseleave', jsLayerId, _onMouseLeaveFeature);
+      if (_dragEnabled) _map.off('mousedown', jsLayerId, _onMouseDown);
     }
     _interactiveFeatureLayerIds.clear();
 
@@ -728,17 +839,21 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
     _addedFeaturesByLayer[sourceId] = data;
     _map.addSource(sourceId, {
       "type": 'geojson',
-      "data": geojson, // pass the raw string here to avoid errors
+      "data": geojson,
       if (promoteId != null) "promoteId": promoteId
     });
   }
 
   Feature _makeFeature(Map<String, dynamic> geojsonFeature) {
+    final coordinates = geojsonFeature["geometry"]["coordinates"];
+    final type = geojsonFeature["geometry"]["type"] as String;
+    // Properties stays as Dart Map (Feature expects Map<String, dynamic>)
+    final properties = geojsonFeature["properties"] as Map<String, dynamic>?;
+
+    // Geometry constructor now handles Dart-to-JS conversion internally
     return Feature(
-        geometry: Geometry(
-            type: geojsonFeature["geometry"]["type"],
-            coordinates: geojsonFeature["geometry"]["coordinates"]),
-        properties: geojsonFeature["properties"],
+        geometry: Geometry(type: type, coordinates: coordinates),
+        properties: properties,
         id: geojsonFeature["properties"]?["id"] ?? geojsonFeature["id"]);
   }
 
@@ -899,10 +1014,11 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
       double? maxzoom,
       dynamic filter,
       required bool enableInteraction}) async {
-    final layout = Map.fromEntries(
-        properties.entries.where((entry) => isLayoutProperty(entry.key)));
-    final paint = Map.fromEntries(
-        properties.entries.where((entry) => !isLayoutProperty(entry.key)));
+    // Filter out null values to avoid Mapbox style validation warnings
+    final layout = Map.fromEntries(properties.entries
+        .where((entry) => isLayoutProperty(entry.key) && entry.value != null));
+    final paint = Map.fromEntries(properties.entries
+        .where((entry) => !isLayoutProperty(entry.key) && entry.value != null));
 
     removeLayer(layerId);
 
@@ -910,8 +1026,8 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
       'id': layerId,
       'type': layerType,
       'source': sourceId,
-      'layout': layout,
-      'paint': paint,
+      if (layout.isNotEmpty) 'layout': layout,
+      if (paint.isNotEmpty) 'paint': paint,
       if (sourceLayer != null) 'source-layer': sourceLayer,
       if (minzoom != null) 'minzoom': minzoom,
       if (maxzoom != null) 'maxzoom': maxzoom,
@@ -920,13 +1036,15 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
 
     if (enableInteraction) {
       _interactiveFeatureLayerIds.add(layerId);
+      // Convert layerId to JSValue for WASM compatibility
+      final jsLayerId = layerId.toJS;
       if (layerType == "fill") {
-        _map.on('mousemove', layerId, _onMouseEnterFeature);
+        _map.on('mousemove', jsLayerId, _onMouseEnterFeature);
       } else {
-        _map.on('mouseenter', layerId, _onMouseEnterFeature);
+        _map.on('mouseenter', jsLayerId, _onMouseEnterFeature);
       }
-      _map.on('mouseleave', layerId, _onMouseLeaveFeature);
-      if (_dragEnabled) _map.on('mousedown', layerId, _onMouseDown);
+      _map.on('mouseleave', jsLayerId, _onMouseLeaveFeature);
+      if (_dragEnabled) _map.on('mousedown', jsLayerId, _onMouseDown);
     }
   }
 

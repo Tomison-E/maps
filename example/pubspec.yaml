@@ -4,7 +4,7 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=2.12.0 <3.0.0'
+  sdk: ">=3.0.0 <4.0.0"
 
 dependencies:
   flutter:
@@ -24,8 +24,6 @@ dependency_overrides:
     path: ../mapbox_gl_platform_interface
   mapbox_gl_web:
     path: ../mapbox_gl_web
-  mapbox_gl_wasm:
-    path: ../mapbox_gl_wasm
 dev_dependencies:
   flutter_test:
     sdk: flutter

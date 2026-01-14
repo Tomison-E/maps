@@ -21,8 +21,6 @@ dependency_overrides:
     path: ./mapbox_gl_platform_interface
   mapbox_gl_web:
     path: ./mapbox_gl_web
-  mapbox_gl_wasm:
-    path: ./mapbox_gl_wasm
 
 flutter:
   plugin:
@@ -36,6 +34,5 @@ flutter:
         default_package: mapbox_gl_web
 
 environment:
-  sdk: '>=2.14.0 <3.0.0'
-  # Flutter versions prior to 1.10 did not support the flutter.plugin.platforms map.
-  flutter: ">=2.0.0"
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"

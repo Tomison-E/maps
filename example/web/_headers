@@ -1,0 +1,7 @@
+# Headers for Flutter WASM (Skwasm) multi-threaded rendering
+# This file works with Netlify, Cloudflare Pages, and similar platforms
+
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: credentialless
+

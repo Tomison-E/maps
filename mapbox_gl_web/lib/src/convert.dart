@@ -281,6 +281,7 @@ class Convert {
       properties['textHaloBlur'] = options.textHaloBlur;
     }
     if (options.geometry != null) {
+      // Geometry handles Dart-to-JS conversion internally
       geometry = Geometry(
         type: geometry.type,
         coordinates: [options.geometry!.longitude, options.geometry!.latitude],
@@ -323,6 +324,7 @@ class Convert {
       properties['linePattern'] = options.linePattern;
     }
     if (options.geometry != null) {
+      // Geometry handles Dart-to-JS conversion internally
       geometry = Geometry(
         type: geometry.type,
         coordinates: options.geometry!
@@ -362,6 +364,7 @@ class Convert {
       properties['circleStrokeOpacity'] = options.circleStrokeOpacity;
     }
     if (options.geometry != null) {
+      // Geometry handles Dart-to-JS conversion internally
       geometry = Geometry(
         type: geometry.type,
         coordinates: [options.geometry!.longitude, options.geometry!.latitude],
@@ -419,6 +422,7 @@ class Convert {
     }
 
     if (options.geometry != null) {
+      // Geometry handles Dart-to-JS conversion internally
       geometry = Geometry(
         type: geometry.type,
         coordinates: fillGeometryToFeatureGeometry(options.geometry!),

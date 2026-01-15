@@ -43,7 +43,7 @@ class ClickAnnotationBodyState extends State<ClickAnnotationBody> {
   @override
   void dispose() {
     controller?.onFillTapped.remove(_onFillTapped);
-    controller?.onCircleTapped.remove(_onCircleTapped);
+   controller?.onCircleTapped.remove(_onCircleTapped);
     controller?.onLineTapped.remove(_onLineTapped);
     controller?.onSymbolTapped.remove(_onSymbolTapped);
     super.dispose();
@@ -77,19 +77,25 @@ class ClickAnnotationBodyState extends State<ClickAnnotationBody> {
   void _onStyleLoaded() {
     controller!.addCircle(
       CircleOptions(
-        geometry: LatLng(-33.881979408447314, 151.171361438502117),
-        circleStrokeColor: "#00FF00",
-        circleStrokeWidth: 2,
-        circleRadius: 16,
-      ),
+          geometry: LatLng(-33.881979408447314, 151.171361438502117),
+          circleStrokeColor: "#00FF00",
+          circleColor: "#000000",
+          circleStrokeWidth: 2,
+          circleRadius: 16,
+          circleOpacity: 1,
+          circleStrokeOpacity: 1,
+          circleBlur: 0),
     );
     controller!.addCircle(
       CircleOptions(
-        geometry: LatLng(-33.894372606072309, 151.17576679759523),
-        circleStrokeColor: "#00FF00",
-        circleStrokeWidth: 2,
-        circleRadius: 30,
-      ),
+          geometry: LatLng(-33.894372606072309, 151.17576679759523),
+          circleStrokeColor: "#00FF00",
+          circleColor: "#000000",
+          circleStrokeWidth: 2,
+          circleRadius: 30,
+          circleOpacity: 1,
+          circleStrokeOpacity: 1,
+          circleBlur: 0),
     );
     controller!.addSymbol(
       SymbolOptions(
@@ -126,6 +132,7 @@ class ClickAnnotationBodyState extends State<ClickAnnotationBody> {
         ],
         fillColor: "#FF0000",
         fillOutlineColor: "#000000",
+        fillOpacity: 1,
       ),
     );
   }

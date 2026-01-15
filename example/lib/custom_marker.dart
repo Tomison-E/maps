@@ -115,7 +115,7 @@ class CustomMarkerState extends State<CustomMarker> {
           _mapController.toScreenLocationBatch(param).then((value) {
             for (var i = 0; i < randomMarkerNum; i++) {
               var point =
-                  Point<double>(value[i].x as double, value[i].y as double);
+                  Point<double>(value[i].x.toDouble(), value[i].y.toDouble());
               _addMarker(point, param[i]);
             }
           });
@@ -196,7 +196,7 @@ class Marker extends StatefulWidget {
 class _MarkerState extends State with TickerProviderStateMixin {
   final _iconSize = 20.0;
 
-  Point _position;
+  Point<num> _position;
 
   late AnimationController _controller;
   late Animation<double> _animation;
@@ -233,8 +233,8 @@ class _MarkerState extends State with TickerProviderStateMixin {
     }
 
     return Positioned(
-        left: _position.x / ratio - _iconSize / 2,
-        top: _position.y / ratio - _iconSize / 2,
+        left: _position.x.toDouble() / ratio - _iconSize / 2,
+        top: _position.y.toDouble() / ratio - _iconSize / 2,
         child: RotationTransition(
             turns: _animation,
             child: Image.asset('assets/symbols/2.0x/custom-icon.png',

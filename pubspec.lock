@@ -62,21 +62,16 @@ packages:
   mapbox_gl_dart:
     dependency: transitive
     description:
-      path: "../mapbox-gl-dart"
-      relative: true
-    source: path
+      path: "."
+      ref: HEAD
+      resolved-ref: "418c320429989ac55676919db1f15163ea7dd56d"
+      url: "https://github.com/Tomison-E/mapbox-gl-dart.git"
+    source: git
     version: "0.3.0"
   mapbox_gl_platform_interface:
     dependency: "direct main"
     description:
       path: mapbox_gl_platform_interface
-      relative: true
-    source: path
-    version: "0.16.0"
-  mapbox_gl_wasm:
-    dependency: "direct overridden"
-    description:
-      path: mapbox_gl_wasm
       relative: true
     source: path
     version: "0.16.0"
@@ -166,4 +161,4 @@ packages:
     version: "6.6.1"
 sdks:
   dart: ">=3.8.0 <4.0.0"
-  flutter: ">=2.0.0"
+  flutter: ">=3.10.0"

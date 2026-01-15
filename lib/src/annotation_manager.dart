@@ -186,13 +186,13 @@ class LineManager extends AnnotationManager<Line> {
         );
 
   static const _baseProperties = LineLayerProperties(
-    lineJoin: [Expressions.get, 'lineJoin'],
-    lineOpacity: [Expressions.get, 'lineOpacity'],
-    lineColor: [Expressions.get, 'lineColor'],
-    lineWidth: [Expressions.get, 'lineWidth'],
-    lineGapWidth: [Expressions.get, 'lineGapWidth'],
-    lineOffset: [Expressions.get, 'lineOffset'],
-    lineBlur: [Expressions.get, 'lineBlur'],
+    lineJoin: [Expressions.coalesce, [Expressions.get, 'lineJoin'], 'round'],
+    lineOpacity: [Expressions.coalesce, [Expressions.get, 'lineOpacity'], 1.0],
+    lineColor: [Expressions.coalesce, [Expressions.get, 'lineColor'], '#000000'],
+    lineWidth: [Expressions.coalesce, [Expressions.get, 'lineWidth'], 1.0],
+    lineGapWidth: [Expressions.coalesce, [Expressions.get, 'lineGapWidth'], 0.0],
+    lineOffset: [Expressions.coalesce, [Expressions.get, 'lineOffset'], 0.0],
+    lineBlur: [Expressions.coalesce, [Expressions.get, 'lineBlur'], 0.0],
   );
   @override
   List<LayerProperties> get allLayerProperties => [
@@ -217,13 +217,13 @@ class FillManager extends AnnotationManager<Fill> {
   @override
   List<LayerProperties> get allLayerProperties => const [
         FillLayerProperties(
-          fillOpacity: [Expressions.get, 'fillOpacity'],
-          fillColor: [Expressions.get, 'fillColor'],
+          fillOpacity: [Expressions.coalesce, [Expressions.get, 'fillOpacity'], 1.0],
+          fillColor: [Expressions.coalesce, [Expressions.get, 'fillColor'], '#000000'],
           fillOutlineColor: [Expressions.get, 'fillOutlineColor'],
         ),
         FillLayerProperties(
-          fillOpacity: [Expressions.get, 'fillOpacity'],
-          fillColor: [Expressions.get, 'fillColor'],
+          fillOpacity: [Expressions.coalesce, [Expressions.get, 'fillOpacity'], 1.0],
+          fillColor: [Expressions.coalesce, [Expressions.get, 'fillColor'], '#000000'],
           fillOutlineColor: [Expressions.get, 'fillOutlineColor'],
           fillPattern: [Expressions.get, 'fillPattern'],
         )
@@ -244,13 +244,13 @@ class CircleManager extends AnnotationManager<Circle> {
   @override
   List<LayerProperties> get allLayerProperties => const [
         CircleLayerProperties(
-          circleRadius: [Expressions.get, 'circleRadius'],
-          circleColor: [Expressions.get, 'circleColor'],
-          circleBlur: [Expressions.get, 'circleBlur'],
-          circleOpacity: [Expressions.get, 'circleOpacity'],
-          circleStrokeWidth: [Expressions.get, 'circleStrokeWidth'],
-          circleStrokeColor: [Expressions.get, 'circleStrokeColor'],
-          circleStrokeOpacity: [Expressions.get, 'circleStrokeOpacity'],
+          circleRadius: [Expressions.coalesce, [Expressions.get, 'circleRadius'], 5.0],
+          circleColor: [Expressions.coalesce, [Expressions.get, 'circleColor'], '#000000'],
+          circleBlur: [Expressions.coalesce, [Expressions.get, 'circleBlur'], 0.0],
+          circleOpacity: [Expressions.coalesce, [Expressions.get, 'circleOpacity'], 1.0],
+          circleStrokeWidth: [Expressions.coalesce, [Expressions.get, 'circleStrokeWidth'], 0.0],
+          circleStrokeColor: [Expressions.coalesce, [Expressions.get, 'circleStrokeColor'], '#000000'],
+          circleStrokeOpacity: [Expressions.coalesce, [Expressions.get, 'circleStrokeOpacity'], 1.0],
         )
       ];
 }
@@ -307,16 +307,16 @@ class SymbolManager extends AnnotationManager<Symbol> {
   @override
   List<LayerProperties> get allLayerProperties => [
         SymbolLayerProperties(
-          iconSize: [Expressions.get, 'iconSize'],
+          iconSize: [Expressions.coalesce, [Expressions.get, 'iconSize'], 1.0],
           iconImage: [Expressions.get, 'iconImage'],
-          iconRotate: [Expressions.get, 'iconRotate'],
-          iconOffset: [Expressions.get, 'iconOffset'],
-          iconAnchor: [Expressions.get, 'iconAnchor'],
-          iconOpacity: [Expressions.get, 'iconOpacity'],
-          iconColor: [Expressions.get, 'iconColor'],
-          iconHaloColor: [Expressions.get, 'iconHaloColor'],
-          iconHaloWidth: [Expressions.get, 'iconHaloWidth'],
-          iconHaloBlur: [Expressions.get, 'iconHaloBlur'],
+          iconRotate: [Expressions.coalesce, [Expressions.get, 'iconRotate'], 0.0],
+          iconOffset: [Expressions.coalesce, [Expressions.get, 'iconOffset'], [Expressions.literal, [0.0, 0.0]]],
+          iconAnchor: [Expressions.coalesce, [Expressions.get, 'iconAnchor'], 'center'],
+          iconOpacity: [Expressions.coalesce, [Expressions.get, 'iconOpacity'], 1.0],
+          iconColor: [Expressions.coalesce, [Expressions.get, 'iconColor'], '#000000'],
+          iconHaloColor: [Expressions.coalesce, [Expressions.get, 'iconHaloColor'], 'rgba(0,0,0,0)'],
+          iconHaloWidth: [Expressions.coalesce, [Expressions.get, 'iconHaloWidth'], 0.0],
+          iconHaloBlur: [Expressions.coalesce, [Expressions.get, 'iconHaloBlur'], 0.0],
           // note that web does not support setting this in a fully data driven
           // way this is a upstream issue
           textFont: kIsWeb
@@ -331,20 +331,20 @@ class SymbolManager extends AnnotationManager<Symbol> {
                   ],
                 ],
           textField: [Expressions.get, 'textField'],
-          textSize: [Expressions.get, 'textSize'],
-          textMaxWidth: [Expressions.get, 'textMaxWidth'],
-          textLetterSpacing: [Expressions.get, 'textLetterSpacing'],
-          textJustify: [Expressions.get, 'textJustify'],
-          textAnchor: [Expressions.get, 'textAnchor'],
-          textRotate: [Expressions.get, 'textRotate'],
-          textTransform: [Expressions.get, 'textTransform'],
-          textOffset: [Expressions.get, 'textOffset'],
-          textOpacity: [Expressions.get, 'textOpacity'],
-          textColor: [Expressions.get, 'textColor'],
-          textHaloColor: [Expressions.get, 'textHaloColor'],
-          textHaloWidth: [Expressions.get, 'textHaloWidth'],
-          textHaloBlur: [Expressions.get, 'textHaloBlur'],
-          symbolSortKey: [Expressions.get, 'zIndex'],
+          textSize: [Expressions.coalesce, [Expressions.get, 'textSize'], 16.0],
+          textMaxWidth: [Expressions.coalesce, [Expressions.get, 'textMaxWidth'], 10.0],
+          textLetterSpacing: [Expressions.coalesce, [Expressions.get, 'textLetterSpacing'], 0.0],
+          textJustify: [Expressions.coalesce, [Expressions.get, 'textJustify'], 'center'],
+          textAnchor: [Expressions.coalesce, [Expressions.get, 'textAnchor'], 'center'],
+          textRotate: [Expressions.coalesce, [Expressions.get, 'textRotate'], 0.0],
+          textTransform: [Expressions.coalesce, [Expressions.get, 'textTransform'], 'none'],
+          textOffset: [Expressions.coalesce, [Expressions.get, 'textOffset'], [Expressions.literal, [0.0, 0.0]]],
+          textOpacity: [Expressions.coalesce, [Expressions.get, 'textOpacity'], 1.0],
+          textColor: [Expressions.coalesce, [Expressions.get, 'textColor'], '#000000'],
+          textHaloColor: [Expressions.coalesce, [Expressions.get, 'textHaloColor'], 'rgba(0,0,0,0)'],
+          textHaloWidth: [Expressions.coalesce, [Expressions.get, 'textHaloWidth'], 0.0],
+          textHaloBlur: [Expressions.coalesce, [Expressions.get, 'textHaloBlur'], 0.0],
+          symbolSortKey: [Expressions.coalesce, [Expressions.get, 'zIndex'], 0],
           iconAllowOverlap: _iconAllowOverlap,
           iconIgnorePlacement: _iconIgnorePlacement,
           textAllowOverlap: _textAllowOverlap,

@@ -281,10 +281,11 @@ class Convert {
       properties['textHaloBlur'] = options.textHaloBlur;
     }
     if (options.geometry != null) {
-      // Geometry handles Dart-to-JS conversion internally
+      // Convert coordinates to JS value for WASM compatibility
+      final coords = [options.geometry!.longitude, options.geometry!.latitude];
       geometry = Geometry(
-        type: geometry.type,
-        coordinates: [options.geometry!.longitude, options.geometry!.latitude],
+        type: geometry.type.toString(),
+        coordinates: _coordinatesToJs(coords),
       );
     }
     if (options.zIndex != null) {
@@ -324,12 +325,13 @@ class Convert {
       properties['linePattern'] = options.linePattern;
     }
     if (options.geometry != null) {
-      // Geometry handles Dart-to-JS conversion internally
+      // Convert coordinates to JS value for WASM compatibility
+      final coords = options.geometry!
+          .map((latLng) => [latLng.longitude, latLng.latitude])
+          .toList();
       geometry = Geometry(
-        type: geometry.type,
-        coordinates: options.geometry!
-            .map((latLng) => [latLng.longitude, latLng.latitude])
-            .toList(),
+        type: geometry.type.toString(),
+        coordinates: _coordinatesToJs(coords),
       );
     }
     if (options.draggable != null) {
@@ -364,10 +366,11 @@ class Convert {
       properties['circleStrokeOpacity'] = options.circleStrokeOpacity;
     }
     if (options.geometry != null) {
-      // Geometry handles Dart-to-JS conversion internally
+      // Convert coordinates to JS value for WASM compatibility
+      final coords = [options.geometry!.longitude, options.geometry!.latitude];
       geometry = Geometry(
-        type: geometry.type,
-        coordinates: [options.geometry!.longitude, options.geometry!.latitude],
+        type: geometry.type.toString(),
+        coordinates: _coordinatesToJs(coords),
       );
     }
     if (options.draggable != null) {
@@ -422,10 +425,11 @@ class Convert {
     }
 
     if (options.geometry != null) {
-      // Geometry handles Dart-to-JS conversion internally
+      // Convert coordinates to JS value for WASM compatibility
+      final coords = fillGeometryToFeatureGeometry(options.geometry!);
       geometry = Geometry(
-        type: geometry.type,
-        coordinates: fillGeometryToFeatureGeometry(options.geometry!),
+        type: geometry.type.toString(),
+        coordinates: _coordinatesToJs(coords),
       );
     }
     return feature.copyWith(properties: properties, geometry: geometry);

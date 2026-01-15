@@ -3,6 +3,22 @@ part of mapbox_gl_web;
 const _mapboxGlCssUrl =
     'https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css';
 
+/// Converts nested Dart coordinate arrays to JS arrays for WASM compatibility.
+/// This handles Point [lng, lat], LineString [[lng, lat], ...], and Polygon [[[lng, lat], ...], ...] geometries.
+JSAny? _coordinatesToJs(dynamic coords) {
+  if (coords == null) return null;
+  if (coords is num) return coords.toJS;
+  if (coords is List) {
+    final jsArray = <JSAny?>[];
+    for (final item in coords) {
+      jsArray.add(_coordinatesToJs(item));
+    }
+    return jsArray.toJS;
+  }
+  // Fallback for other types
+  return coords.toString().toJS;
+}
+
 class MapboxWebGlPlatform extends MapboxGlPlatform
     implements MapboxMapOptionsSink {
   late web.HTMLDivElement _mapElement;
@@ -123,7 +139,7 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
           _onStyleLoaded(e);
 
           // Register interaction events after map is fully loaded
-          _map.on('click', _onMapClick);
+          _registerClickHandler();
           // long click not available in web, so it is mapped to double click
           _map.on('dblclick', _onMapLongClick);
 
@@ -507,12 +523,31 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
     });
   }
 
-  void _onMapClick(Event e) {
-    final features = _map.queryRenderedFeatures([e.point.x, e.point.y],
+  void _registerClickHandler() async {
+    // Wait for map to be truly loaded
+    while (!_map.loaded()) {
+      await Future.delayed(Duration(milliseconds: 50));
+    }
+    
+    // Use direct canvas click listener since Mapbox's on('click') 
+    // doesn't work reliably with Flutter web's JS interop
+    final canvas = _map.getCanvas();
+    canvas.addEventListener('click', ((web.MouseEvent e) {
+      _handleCanvasClick(e.offsetX.toDouble(), e.offsetY.toDouble());
+    }).toJS);
+  }
+
+  void _handleCanvasClick(double x, double y) {
+    // Convert screen coordinates to geographic coordinates
+    final lngLat = _map.unproject(mapbox.Point(x, y));
+    
+    // Query features at click point
+    final point = [[x, y], [x, y]];
+    final features = _map.queryRenderedFeatures(point,
         {"layers": _interactiveFeatureLayerIds.toList()});
     final payload = {
-      'point': Point<double>(e.point.x.toDouble(), e.point.y.toDouble()),
-      'latLng': LatLng(e.lngLat.lat.toDouble(), e.lngLat.lng.toDouble()),
+      'point': Point<double>(x, y),
+      'latLng': LatLng(lngLat.lat as double, lngLat.lng as double),
       if (features.isNotEmpty) "id": features.first.id,
     };
     if (features.isNotEmpty) {
@@ -521,6 +556,7 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
       onMapClickPlatform(payload);
     }
   }
+
 
   void _onMapLongClick(e) {
     onMapLongClickPlatform({
@@ -846,13 +882,16 @@ class MapboxWebGlPlatform extends MapboxGlPlatform
 
   Feature _makeFeature(Map<String, dynamic> geojsonFeature) {
     final coordinates = geojsonFeature["geometry"]["coordinates"];
-    final type = geojsonFeature["geometry"]["type"] as String;
+    final type = geojsonFeature["geometry"]["type"]?.toString() ?? 'Point';
     // Properties stays as Dart Map (Feature expects Map<String, dynamic>)
     final properties = geojsonFeature["properties"] as Map<String, dynamic>?;
 
-    // Geometry constructor now handles Dart-to-JS conversion internally
+    // Convert coordinates to JS value for WASM compatibility
+    // In dart2wasm, Dart collections must be explicitly converted to JS types
+    final jsCoordinates = _coordinatesToJs(coordinates);
+
     return Feature(
-        geometry: Geometry(type: type, coordinates: coordinates),
+        geometry: Geometry(type: type, coordinates: jsCoordinates),
         properties: properties,
         id: geojsonFeature["properties"]?["id"] ?? geojsonFeature["id"]);
   }

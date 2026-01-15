@@ -4,7 +4,6 @@ import 'dart:js_interop';
 
 import 'package:mapbox_gl_dart/mapbox_gl_dart.dart';
 import 'package:mapbox_gl_dart/src/interop/interop.dart';
-import 'package:mapbox_gl_dart/src/utils.dart';
 import 'package:web/web.dart' as web;
 
 ///  The `MapboxMap` object represents the map on your page. It exposes methods
@@ -408,18 +407,41 @@ class MapboxMap extends Camera {
   ///  @see [Filter features within map view](https://www.mapbox.com/mapbox-gl-js/example/filter-features-within-map-view/)
   List<Feature> queryRenderedFeatures(dynamic geometry,
       [Map<String, dynamic>? options]) {
+    // Convert geometry to JS-compatible format
+    JSAny? jsGeometry;
+    if (geometry != null) {
+      if (geometry is List) {
+        jsGeometry = _jsifyList(geometry);
+      } else if (geometry is JSAny) {
+        jsGeometry = geometry;
+      }
+    }
+
     if (options == null) {
       return jsObject
-          .queryRenderedFeatures(jsifyAny(geometry))
+          .queryRenderedFeatures(jsGeometry)
           .toDart
           .map((dynamic f) => Feature.fromJsObject(f))
           .toList();
     }
     return jsObject
-        .queryRenderedFeatures(jsifyAny(geometry), jsifyAny(options))
+        .queryRenderedFeatures(jsGeometry, options.jsify())
         .toDart
         .map((dynamic f) => Feature.fromJsObject(f))
         .toList();
+  }
+
+  /// Helper to convert nested lists to JS arrays
+  static JSAny? _jsifyList(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toJS;
+    if (value is String) return value.toJS;
+    if (value is bool) return value.toJS;
+    if (value is List) {
+      return value.map((e) => _jsifyList(e)).toList().toJS;
+    }
+    if (value is JSAny) return value;
+    return null;
   }
 
   ///  Returns an array of [GeoJSON](http://geojson.org/)
@@ -458,7 +480,7 @@ class MapboxMap extends Camera {
   ///
   ///  @see [Highlight features containing similar data](https://www.mapbox.com/mapbox-gl-js/example/query-similar-features/)
   List<dynamic> querySourceFeatures(String sourceId, dynamic parameters) =>
-      jsObject.querySourceFeatures(sourceId, jsifyAny(parameters)).toDart;
+      jsObject.querySourceFeatures(sourceId, parameters?.jsify()).toDart;
 
   ///  Updates the map's Mapbox style object with a new value.
   ///
@@ -486,7 +508,7 @@ class MapboxMap extends Camera {
   ///
   ///  @see [Change a map's style](https://www.mapbox.com/mapbox-gl-js/example/setstyle/)
   MapboxMap setStyle(dynamic style, [dynamic options]) =>
-      MapboxMap.fromJsObject(jsObject.setStyle(style is String ? style.toJS : jsifyAny(style)));
+      MapboxMap.fromJsObject(jsObject.setStyle(style is String ? style.toJS : style?.jsify()));
 
   ///  Returns the map's Mapbox style object, which can be used to recreate the map's style.
   ///
@@ -539,7 +561,7 @@ class MapboxMap extends Camera {
     if (source is Source) {
       return MapboxMap.fromJsObject(jsObject.addSource(id, source.jsObject));
     }
-    return MapboxMap.fromJsObject(jsObject.addSource(id, jsifyAny(source) as JSObject));
+    return MapboxMap.fromJsObject(jsObject.addSource(id, (source as Map).jsify()));
   }
 
   ///  Returns a Boolean indicating whether the source is loaded.
@@ -565,7 +587,7 @@ class MapboxMap extends Camera {
   ///  @param {Function} SourceType A {@link Source} constructor.
   ///  @param {Function} callback Called when the source type is ready or with an error argument if there is an error.
   addSourceType(String name, dynamic sourceType, JSFunction callback) =>
-      jsObject.addSourceType(name, jsifyAny(sourceType), callback);
+      jsObject.addSourceType(name, sourceType?.jsify(), callback);
 
   ///  Removes a source from the map's style.
   ///
@@ -639,13 +661,13 @@ class MapboxMap extends Camera {
   ///
   ///  @see Use `HTMLImageElement`: [Add an icon to the map](https://www.mapbox.com/mapbox-gl-js/example/add-image/)
   ///  @see Use `ImageData`: [Add a generated icon to the map](https://www.mapbox.com/mapbox-gl-js/example/add-image-generated/)
-  void addImage(String id, dynamic image, [Map<String, dynamic>? options]) {
-    final jsImage = image is Map ? jsifyAny(image) : image;
-    if (options == null) {
-      jsObject.addImage(id, jsImage);
-    } else {
-      jsObject.addImage(id, jsImage, jsifyAny(options));
+  addImage(String id, dynamic image, [Map<String, dynamic>? options]) {
+    if (image is Map) {
+      image = image.jsify();
     }
+    return options == null
+        ? jsObject.addImage(id, image)
+        : jsObject.addImage(id, image, options.jsify());
   }
 
   ///  Update an existing image in a style. This image can be displayed on the map like any other icon in the style's
@@ -760,7 +782,7 @@ class MapboxMap extends Camera {
       return MapboxMap.fromJsObject(
           jsObject.addLayer(layer.jsObject, beforeId));
     }
-    return MapboxMap.fromJsObject(jsObject.addLayer(jsifyAny(layer) as JSObject, beforeId));
+    return MapboxMap.fromJsObject(jsObject.addLayer((layer as Map).jsify(), beforeId));
   }
 
   //jsObject.addLayer(layer.jsObject ?? jsify(layer));
@@ -840,8 +862,8 @@ class MapboxMap extends Camera {
   ///  @see [Highlight features containing similar data](https://www.mapbox.com/mapbox-gl-js/example/query-similar-features/)
   ///  @see [Create a timeline animation](https://www.mapbox.com/mapbox-gl-js/example/timeline-animation/)
   MapboxMap setFilter(String layerId, dynamic filter,
-          [StyleSetterOptions? options]) =>
-      MapboxMap.fromJsObject(jsObject.setFilter(layerId, jsifyAny(filter)));
+      [StyleSetterOptions? options]) =>
+      MapboxMap.fromJsObject(jsObject.setFilter(layerId, filter?.jsify()));
 
   ///  Returns the filter applied to the specified style layer.
   ///
@@ -865,8 +887,8 @@ class MapboxMap extends Camera {
   ///  @see [Adjust a layer's opacity](https://www.mapbox.com/mapbox-gl-js/example/adjust-layer-opacity/)
   ///  @see [Create a draggable point](https://www.mapbox.com/mapbox-gl-js/example/drag-a-point/)
   setPaintProperty(String layerId, String name, dynamic value,
-          [StyleSetterOptions? options]) =>
-      jsObject.setPaintProperty(layerId, name, jsifyAny(value));
+      [StyleSetterOptions? options]) =>
+      jsObject.setPaintProperty(layerId, name, value?.jsify());
 
   ///  Returns the value of a paint property in the specified style layer.
   ///
@@ -887,8 +909,8 @@ class MapboxMap extends Camera {
   ///  @example
   ///  map.setLayoutProperty('my-layer', 'visibility', 'none');
   MapboxMap setLayoutProperty(String layerId, String name, dynamic value,
-          [StyleSetterOptions? options]) =>
-      MapboxMap.fromJsObject(jsObject.setLayoutProperty(layerId, name, jsifyAny(value)));
+      [StyleSetterOptions? options]) =>
+      MapboxMap.fromJsObject(jsObject.setLayoutProperty(layerId, name, value?.jsify()));
 
   ///  Returns the value of a layout property in the specified style layer.
   ///
@@ -905,7 +927,7 @@ class MapboxMap extends Camera {
   ///  @param {boolean} [options.validate=true] Whether to check if the filter conforms to the Mapbox GL Style Specification. Disabling validation is a performance optimization that should only be used if you have previously validated the values you will be passing to this function.
   ///  @returns {MapboxMap} `this`
   MapboxMap setLight(dynamic light, StyleSetterOptions options) =>
-      MapboxMap.fromJsObject(jsObject.setLight(jsifyAny(light), options.jsObject));
+      MapboxMap.fromJsObject(jsObject.setLight(light?.jsify(), options.jsObject));
 
   ///  Returns the value of the light object.
   ///
@@ -929,7 +951,7 @@ class MapboxMap extends Camera {
   ///  option assigns ids based on a feature's index in the source data. If you change feature data using
   ///  `map.getSource('some id').setData(..)`, you may need to re-apply state taking into account updated `id` values.
   setFeatureState(dynamic feature, dynamic state) =>
-      jsObject.setFeatureState(jsifyAny(feature), jsifyAny(state));
+      jsObject.setFeatureState(feature?.jsify(), state?.jsify());
 
   ///  Removes feature state, setting it back to the default behavior. If only
   ///  source is specified, removes all states of that source. If
@@ -945,7 +967,7 @@ class MapboxMap extends Camera {
   ///   required.*
   ///  @param {string} key (optional) The key in the feature state to reset.
   removeFeatureState(dynamic target, [String? key]) =>
-      jsObject.removeFeatureState(jsifyAny(target), key);
+      jsObject.removeFeatureState(target?.jsify(), key);
 
   ///  Gets the state of a feature.
   ///  Features are identified by their `id` attribute, which must be an integer or a string that can be
@@ -960,7 +982,7 @@ class MapboxMap extends Camera {
   ///
   ///  @returns {Object} The state of the feature.
   dynamic getFeatureState(dynamic feature) =>
-      jsObject.getFeatureState(jsifyAny(feature));
+      jsObject.getFeatureState(feature?.jsify());
 
   ///  Returns the map's containing HTML element.
   ///
@@ -1297,7 +1319,7 @@ class MapOptions extends JsObjectWrapper<MapOptionsJsImpl> {
         pitchWithRotate: pitchWithRotate?.toJS ?? true.toJS,
         clickTolerance: clickTolerance?.toJS,
         attributionControl: attributionControl?.toJS ?? true.toJS,
-        customAttribution: jsifyAny(customAttribution),
+        customAttribution: customAttribution?.jsify(),
         logoPosition: (logoPosition ?? 'bottom-left').toJS,
         failIfMajorPerformanceCaveat: failIfMajorPerformanceCaveat?.toJS,
         preserveDrawingBuffer: preserveDrawingBuffer?.toJS,
@@ -1309,7 +1331,7 @@ class MapOptions extends JsObjectWrapper<MapOptionsJsImpl> {
         maxZoom: maxZoom?.toJS,
         minPitch: minPitch?.toJS,
         maxPitch: maxPitch?.toJS,
-        style: style is String ? style.toJS : jsifyAny(style),
+        style: style is String ? style.toJS : style?.jsify(),
         boxZoom: boxZoom?.toJS,
         dragRotate: dragRotate?.toJS,
         dragPan: dragPan?.toJS ?? true.toJS,
@@ -1322,7 +1344,7 @@ class MapOptions extends JsObjectWrapper<MapOptionsJsImpl> {
         bearing: bearing?.toJS,
         pitch: pitch?.toJS,
         bounds: bounds?.jsObject,
-        fitBoundsOptions: jsifyAny(fitBoundsOptions),
+        fitBoundsOptions: fitBoundsOptions?.jsify(),
         renderWorldCopies: renderWorldCopies?.toJS,
         maxTileCacheSize: maxTileCacheSize?.toJS,
         localIdeographFontFamily: localIdeographFontFamily?.toJS,
@@ -1331,7 +1353,7 @@ class MapOptions extends JsObjectWrapper<MapOptionsJsImpl> {
         fadeDuration: fadeDuration?.toJS,
         crossSourceCollisions: crossSourceCollisions?.toJS,
         accessToken: accessToken?.toJS,
-        locale: jsifyAny(locale),
+        locale: locale?.jsify(),
       ));
 
   /// Creates a new MapOptions from a [jsObject].
@@ -1356,7 +1378,7 @@ class RequestParameters extends JsObjectWrapper<RequestParametersJsImpl> {
       RequestParameters.fromJsObject(RequestParametersJsImpl(
         url: url?.toJS,
         credentials: credentials?.toJS,
-        headers: jsifyAny(headers),
+        headers: headers?.jsify(),
         method: method?.toJS,
         collectResourceTiming: collectResourceTiming?.toJS,
       ));

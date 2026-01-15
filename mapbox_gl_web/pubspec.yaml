@@ -20,8 +20,7 @@ dependencies:
   mapbox_gl_platform_interface:
     path: ../mapbox_gl_platform_interface
   mapbox_gl_dart:
-    git:
-      url: https://github.com/Tomison-E/mapbox-gl-dart.git
+    path: ../mapbox_gl_dart
   image: '>=3.0.0 <5.0.0'
 
 dev_dependencies:
